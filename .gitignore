@@ -1,0 +1,28 @@
+# 依赖与构建产物
+frontend/node_modules/
+frontend/dist/
+frontend/src-tauri/target/
+frontend/src-tauri/gen/
+
+# 图标生成戳（构建期产物，不是源文件）
+frontend/src-tauri/icons/.app-icon.sha256
+
+# 打包输出（绿色版 exe 走 GitHub Releases，不入库）
+release/
+
+# 本机环境配置 / 助手工作目录
+.cargo/
+.workbuddy/
+
+# 临时文件与日志
+_tmp_*
+*.log
+@AutomationLog.txt
+
+# 系统垃圾
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 真机验证截图（本地留档，不入库）
+scripts/shot-*.png

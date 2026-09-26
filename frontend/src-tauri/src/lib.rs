@@ -14,6 +14,8 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[cfg(target_os = "windows")]
 mod webview2_gate;
+#[cfg(target_os = "windows")]
+mod rounded_frame;
 
 // ---------- global state ----------
 struct LauncherState {
@@ -2004,71 +2006,6 @@ fn suppress_accent_border(window: &tauri::WebviewWindow) {
     }
 }
 
-/// 圆角策略（不透明窗口方案，不依赖逐像素透明 —— Aero Peek / 任务栏缩略图 /
-/// 激活态等 DWM 各合成路径下都不会出现白边，社区公认的稳妥做法）：
-/// - Win11（build 22000+）：DWMWA_WINDOW_CORNER_PREFERENCE，DWM 原生抗锯齿圆角；
-/// - Win10：该属性不支持（调用失败），退回 SetWindowRgn 圆角区域硬裁剪，
-///   区域用 DWMWA_EXTENDED_FRAME_BOUNDS 计算（不含隐形缩放边框，避免角落残影）。
-#[cfg(target_os = "windows")]
-fn apply_rounded_corners(window: &tauri::WebviewWindow) {
-    use windows::Win32::Foundation::{HWND, RECT};
-    use windows::Win32::Graphics::Dwm::{
-        DwmGetWindowAttribute, DwmSetWindowAttribute, DWMWINDOWATTRIBUTE,
-        DWMWA_EXTENDED_FRAME_BOUNDS,
-    };
-    use windows::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
-    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
-    const DWMWCP_ROUND: u32 = 2;
-    const CORNER_ELLIPSE: i32 = 32; // 视觉半径约 16px，与界面圆角语言一致
-
-    let hwnd = match window.hwnd() {
-        Ok(h) => HWND(h.0 as *mut core::ffi::c_void),
-        Err(_) => return,
-    };
-    unsafe {
-        // Win11 原生圆角：设置成功即由 DWM 接管（最大化时自动变直角），无需 region
-        let pref: u32 = DWMWCP_ROUND;
-        let hr = DwmSetWindowAttribute(
-            hwnd,
-            DWMWINDOWATTRIBUTE(DWMWA_WINDOW_CORNER_PREFERENCE as i32),
-            &pref as *const u32 as *const core::ffi::c_void,
-            std::mem::size_of::<u32>() as u32,
-        );
-        if hr.is_ok() {
-            return;
-        }
-
-        // ---- Win10 回退：SetWindowRgn ----
-        if window.is_maximized().unwrap_or(false) {
-            let _ = SetWindowRgn(hwnd, None, true);
-            return;
-        }
-        let (Ok(pos), Ok(size)) = (window.outer_position(), window.outer_size()) else {
-            return;
-        };
-        let mut fb = RECT::default();
-        let visible = DwmGetWindowAttribute(
-            hwnd,
-            DWMWA_EXTENDED_FRAME_BOUNDS,
-            &mut fb as *mut RECT as *mut core::ffi::c_void,
-            std::mem::size_of::<RECT>() as u32,
-        )
-        .is_ok();
-        let (l, t, r, b) = if visible {
-            (fb.left - pos.x, fb.top - pos.y, fb.right - pos.x, fb.bottom - pos.y)
-        } else {
-            (0, 0, size.width as i32, size.height as i32)
-        };
-        let rgn = CreateRoundRectRgn(l, t, r + 1, b + 1, CORNER_ELLIPSE, CORNER_ELLIPSE);
-        if !rgn.is_invalid() {
-            // 成功后系统接管 region，不可再 DeleteObject
-            if SetWindowRgn(hwnd, Some(rgn), true) == 0 {
-                let _ = DeleteObject(rgn.into());
-            }
-        }
-    }
-}
-
 pub fn run() {
     // WebView2 缺失时窗口能建出来但内容渲染不出来 —— 用户只会看到一个白屏。
     // 所以先检测，缺了就显示原生说明窗口（不依赖 WebView2），然后退出。
@@ -2088,10 +2025,12 @@ pub fn run() {
                 // 不透明窗口：把 WebView2 默认白底换成应用底色，消除启动白闪
                 let _ = win.set_background_color(Some(tauri::webview::Color(242, 243, 247, 255)));
                 suppress_accent_border(&win);
-                apply_rounded_corners(&win);
+                crate::rounded_frame::apply_rounded_corners(&win);
                 let win2 = win.clone();
                 win.on_window_event(move |event| match event {
-                    tauri::WindowEvent::Resized(_) => apply_rounded_corners(&win2),
+                    tauri::WindowEvent::Resized(_) => {
+                        crate::rounded_frame::apply_rounded_corners(&win2)
+                    }
                     // 关窗口 = 退程序，先把 ComfyUI 收掉，不留后台进程
                     tauri::WindowEvent::CloseRequested { .. } => {
                         shutdown_comfy(win2.app_handle());

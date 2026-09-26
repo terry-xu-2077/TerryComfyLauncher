@@ -30,6 +30,8 @@
 
 
   --sidebar-w: 168px;
+  /* 窗口圆角：必须与 Rust 侧 rounded_frame.rs 的 CORNER_RADIUS 完全一致 */
+  --window-radius: 16px;
   --radius-lg: 20px;
   --radius-md: 16px;
   --shadow: 0 10px 26px rgba(30, 40, 80, 0.08);
@@ -66,13 +68,16 @@ body {
   min-height: 0;
 }
 
-/* frameless mode: 不透明满铺，圆角由 Win11 DWM / Win10 SetWindowRgn 裁剪；
-   用内嵌细边线勾勒轮廓（外阴影在区域裁剪方案下不可行） */
+/* frameless mode: 不透明满铺。
+   圆角半径必须与 Rust 侧 rounded_frame.rs 的 CORNER_RADIUS 保持一致 —— 内容圆角由
+   Chromium 裁剪（自带抗锯齿），窗口轮廓由叠加的描边窗决定，两者必须落在同一条路径上。 */
 .app.frameless {
   margin: 0;
   height: 100%;
-  border-radius: 0;
-  box-shadow: inset 0 0 0 1px rgba(15, 25, 60, 0.10);
+  border-radius: var(--window-radius);
+  /* 描边窗已经画了轮廓线，这里只留极淡的一层：
+     描边窗因故没起来（或 Win11 由 DWM 接管）时，界面不至于完全没有边界。 */
+  box-shadow: inset 0 0 0 1px rgba(15, 25, 60, 0.06);
 }
 
 /* ---------- custom titlebar (frameless) ---------- */

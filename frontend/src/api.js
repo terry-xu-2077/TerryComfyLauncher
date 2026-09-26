@@ -26,6 +26,7 @@ const ROUTES = {
   'models:get': ['models_get', () => ({})],
   'models:scan': ['models_scan', (a) => ({ basePath: a[0] })],
   'models:save': ['models_save', (a) => ({ entries: a[0] })],
+  'frame:setStyle': ['frame_set_style', (a) => ({ color: a[0], size: a[1] })],
 }
 
 const demoNodes = [
@@ -114,6 +115,19 @@ const tauri = {
     listen('comfy-error', (e) => cb(e.payload)).then((fn) => { unlisten = fn })
     return () => unlisten()
   },
+}
+
+// 把 CSS 里的窗口描边样式交给 Rust 的描边窗。Rust 读不到 CSS，只能由前端代读
+// 再 IPC 过去；浏览器预览（mock）下没有窗口外壳，直接跳过。
+// 想在运行时改描边，改掉 :root 上的变量后重新调一次这个函数即可。
+export function applyWindowFrameStyle() {
+  if (!isTauri) return
+  const css = getComputedStyle(document.documentElement)
+  const color = (css.getPropertyValue('--win-stroke') || '').trim()
+  const size = (css.getPropertyValue('--win-stroke-size') || '').trim()
+  if (!color && !size) return
+  // 描边是纯装饰，拿不到就沿用 Rust 侧的兜底值，不打扰用户
+  api.invoke('frame:setStyle', color, size).catch(() => { })
 }
 
 export const api = isTauri ? tauri : mock

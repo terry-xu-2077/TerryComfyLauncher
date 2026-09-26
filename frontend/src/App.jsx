@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { api, isMock } from './api.js'
+import { api, applyWindowFrameStyle, isMock } from './api.js'
 import Sidebar from './components/Sidebar.jsx'
 import WinControls from './components/WinControls.jsx'
 import SettingsModal from './components/SettingsModal.jsx'
@@ -41,6 +41,8 @@ export default function App() {
   notifyRef.current = notify
 
   useEffect(() => {
+    // 挂载时样式表一定已经生效，这里再送一次描边样式（main.jsx 里那次可能太早）
+    applyWindowFrameStyle()
     ; (async () => {
       setSettings(await api.invoke('settings:get'))
       await refresh()

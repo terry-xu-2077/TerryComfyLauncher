@@ -29,8 +29,16 @@
   --orange: #ffa875;
 
 
+  /* 窗口外描边（Win10 才用得上：Win11 由 DWM 自己画圆角）。
+     改这两个值就能调窗口轮廓的颜色和粗细 —— 前端读它们后通过 IPC 交给
+     Rust 的描边窗（src-tauri/src/rounded_frame.rs），改完重新打包才生效。
+     颜色必须是不透明的（不要写 rgba 半透明）。原生侧会保留最小物理像素
+     覆盖带，避免细描边的羽化区露出窗口硬裁剪的台阶。 */
+  --win-stroke: #727b9d;
+  --win-stroke-size: 1px;
+
   --sidebar-w: 168px;
-  /* 窗口圆角：必须与 Rust 侧 rounded_frame.rs 的 CORNER_RADIUS 完全一致 */
+  /* 窗口圆角：必须与 Rust 侧 frame_geometry.rs 的 CORNER_RADIUS 完全一致 */
   --window-radius: 16px;
   --radius-lg: 20px;
   --radius-md: 16px;
@@ -69,7 +77,7 @@ body {
 }
 
 /* frameless mode: 不透明满铺。
-   圆角半径必须与 Rust 侧 rounded_frame.rs 的 CORNER_RADIUS 保持一致 —— 内容圆角由
+   圆角半径必须与 Rust 侧 frame_geometry.rs 的 CORNER_RADIUS 保持一致 —— 内容圆角由
    Chromium 裁剪（自带抗锯齿），窗口轮廓由叠加的描边窗决定，两者必须落在同一条路径上。 */
 .app.frameless {
   margin: 0;

@@ -1985,6 +1985,17 @@ fn models_save(app: AppHandle, entries: Value) -> Result<Value, String> {
     Ok(json!({"ok": true}))
 }
 
+/// 前端把 CSS 里的窗口描边样式送进来：`--win-stroke`（颜色）与
+/// `--win-stroke-size`（线粗，CSS 像素）。Rust 读不到 CSS，所以只能这么传。
+/// 解析失败会静默沿用当前值 —— 描边是纯装饰，不该因为它让启动失败。
+#[tauri::command]
+fn frame_set_style(color: String, size: String) {
+    #[cfg(target_os = "windows")]
+    crate::rounded_frame::set_style(&color, &size);
+    #[cfg(not(target_os = "windows"))]
+    let _ = (color, size);
+}
+
 // ---------- entry ----------
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// Windows 11 会在窗口矩形外缘画一圈强调色边框（截图里的"蓝色外边框"）。
@@ -2060,6 +2071,7 @@ pub fn run() {
             models_get,
             models_scan,
             models_save,
+            frame_set_style,
         ])
         .build(tauri::generate_context!());
 
